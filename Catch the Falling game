@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Catch the Falling Objects</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div id="game-container">
+    <div id="basket"></div>
+  </div>
+  <div id="score">Score: 0</div>
+  <script src="script.js"></script>
+</body>
+</html>
+
+body {
+  margin: 0;
+  padding: 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #f0f8ff;
+  font-family: Arial, sans-serif;
+}
+
+#game-container {
+  position: relative;
+  width: 400px;
+  height: 600px;
+  background: #f2e9e4;
+  border: 2px solid #ccc;
+  overflow: hidden;
+}
+
+#basket {
+  position: absolute;
+  bottom: 10px;
+  width: 80px;
+  height: 20px;
+  background: #8a5a44;
+  left: 160px;
+}
+
+.object {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background: #f08080;
+  top: 0;
+}
+
+#score {
+  position: absolute;
+  top: 10px;
+  font-size: 18px;
+}
+
+
+// Select DOM elements
+const gameContainer = document.getElementById('game-container');
+const basket = document.getElementById('basket');
+
+// Create and style score and timer
+const scoreElement = document.createElement('div');
+scoreElement.id = 'score';
+scoreElement.style.textAlign = 'center';
+scoreElement.style.padding = '10px';
+scoreElement.style.backgroundColor = '#f8f9fa';
+scoreElement.style.border = '2px solid #007bff';
+scoreElement.style.borderRadius = '5px';
+scoreElement.style.margin = '10px';
+scoreElement.style.display = 'inline-block';
+
+document.body.insertBefore(scoreElement, gameContainer);
+
+const timerElement = document.createElement('div');
+timerElement.id = 'timer';
+timerElement.style.textAlign = 'center';
+timerElement.style.padding = '10px';
+timerElement.style.backgroundColor = '#f8f9fa';
+timerElement.style.border = '2px solid #007bff';
+timerElement.style.borderRadius = '5px';
+timerElement.style.margin = '10px';
+timerElement.style.display = 'inline-block';
+
+document.body.insertBefore(timerElement, scoreElement);
+
+// Create control buttons container
+const controlsContainer = document.createElement('div');
+controlsContainer.id = 'controls';
+controlsContainer.style.position = 'fixed';
+controlsContainer.style.bottom = '10px';
+controlsContainer.style.left = '0';
+controlsContainer.style.width = '100%';
+controlsContainer.style.textAlign = 'center';
+controlsContainer.style.display = 'flex';
+controlsContainer.style.justifyContent = 'center';
+controlsContainer.style.gap = '10px';
+document.body.appendChild(controlsContainer);
+
+// Create and style buttons
+const startButton = document.createElement('button');
+startButton.textContent = 'Start';
+startButton.style.padding = '10px 20px';
+startButton.style.backgroundColor = '#28a745';
+startButton.style.color = 'white';
+startButton.style.border = 'none';
+startButton.style.borderRadius = '5px';
+
+const pauseButton = document.createElement('button');
+pauseButton.textContent = 'Pause';
+pauseButton.style.padding = '10px 20px';
+pauseButton.style.backgroundColor = '#ffc107';
+pauseButton.style.color = 'white';
+pauseButton.style.border = 'none';
+pauseButton.style.borderRadius = '5px';
+
+const restartButton = document.createElement('button');
+restartButton.textContent = 'Restart';
+restartButton.style.padding = '10px 20px';
+restartButton.style.backgroundColor = '#dc3545';
+restartButton.style.color = 'white';
+restartButton.style.border = 'none';
+restartButton.style.borderRadius = '5px';
+
+controlsContainer.appendChild(startButton);
+controlsContainer.appendChild(pauseButton);
+controlsContainer.appendChild(restartButton);
+
+// Initialize variables
+let score = 0;
+let gameInterval;
+let objectFallInterval;
+let gameTime = 60; // Game duration in seconds
+let difficultyLevel = 1; // Start difficulty level
+let highScores = JSON.parse(localStorage.getItem('highScores')) || [];
+let isPaused = false;
+
+// Load sound for basket hit
+const hitSound = new Audio('https://www.soundjay.com/button/beep-07.wav');
+
+// Move basket
+basket.style.border = '3px solid #007bff';
+basket.style.borderRadius = '10px';
+basket.style.backgroundColor = '#17a2b8';
+basket.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+
+const basketWidth = 80;
+document.addEventListener('keydown', (event) => {
+    if (isPaused) return;
+    const basketLeft = parseInt(window.getComputedStyle(basket).left);
+    if (event.key === 'ArrowLeft' && basketLeft > 0) {
+        basket.style.left = basketLeft - 20 + 'px';
+    }
+    if (event.key === 'ArrowRight' && basketLeft < 400 - basketWidth) {
+        basket.style.left = basketLeft + 20 + 'px';
+    }
+});
+
+// Generate falling objects
+function createFallingObject() {
+    if (isPaused) return;
+
+    const object = document.createElement('div');
+    const isSpecial = Math.random() < 0.2; // 20% chance for a special object
+    object.classList.add('object');
+    object.style.left = Math.random() * (400 - 20) + 'px';
+    object.style.backgroundColor = isSpecial ? 'gold' : getRandomColor();
+    object.style.border = '2px solid white';
+    object.style.boxShadow = '0 4px 8px rgba(0, 0, 0, 0.2)';
+    object.style.borderRadius = '50%';
+    object.style.width = '20px';
+    object.style.height = '20px';
+    object.style.position = 'absolute';
+    object.style.top = '0px';
+    gameContainer.appendChild(object);
+
+    let fallingInterval = setInterval(() => {
+        if (isPaused) return;
+
+        const objectTop = parseInt(window.getComputedStyle(object).top);
+        const basketLeft = parseInt(window.getComputedStyle(basket).left);
+        const basketTop = parseInt(window.getComputedStyle(basket).top);
+
+        // Collision detection
+        if (
+            objectTop > 580 &&
+            objectTop < 600 &&
+            parseInt(object.style.left) > basketLeft &&
+            parseInt(object.style.left) < basketLeft + basketWidth
+        ) {
+            clearInterval(fallingInterval);
+            if (object.parentElement) {
+                object.style.transition = 'opacity 0.3s';
+                object.style.opacity = '0';
+                setTimeout(() => {
+                    gameContainer.removeChild(object);
+                }, 300);
+            }
+            hitSound.play();
+            score += isSpecial ? 5 : 1; // Special objects give bonus points
+            scoreElement.textContent = `Score: ${score}`;
+        } else if (objectTop > 600) {
+            clearInterval(fallingInterval);
+            if (object.parentElement) {
+                gameContainer.removeChild(object);
+            }
+        } else {
+            object.style.top = objectTop + difficultyLevel + 'px'; // Speed increases with difficulty
+        }
+    }, 30);
+}
+
+// Get random color
+function getRandomColor() {
+    const letters = '0123456789ABCDEF';
+    let color = '#';
+    for (let i = 0; i < 6; i++) {
+        color += letters[Math.floor(Math.random() * 16)];
+    }
+    return color;
+}
+
+// Update difficulty level
+function updateDifficulty() {
+    difficultyLevel++;
+    clearInterval(objectFallInterval);
+    objectFallInterval = setInterval(createFallingObject, Math.max(500 - difficultyLevel * 50, 200));
+}
+
+// Timer and game logic
+function startGame() {
+    isPaused = false;
+    timerElement.textContent = `Time: ${gameTime}`;
+    scoreElement.textContent = `Score: ${score}`;
+
+    if (!gameInterval) {
+        gameInterval = setInterval(() => {
+            if (isPaused) return;
+
+            gameTime--;
+            timerElement.textContent = `Time: ${gameTime}`;
+
+            if (gameTime % 10 === 0) {
+                updateDifficulty();
+            }
+
+            if (gameTime <= 0) {
+                clearInterval(gameInterval);
+                clearInterval(objectFallInterval);
+                endGame();
+            }
+        }, 1000);
+    }
+
+    if (!objectFallInterval) {
+        objectFallInterval = setInterval(createFallingObject, 1000);
+    }
+}
+
+// Pause game
+function pauseGame() {
+    isPaused = true;
+}
+
+// Restart game
+function restartGame() {
+    clearInterval(gameInterval);
+    clearInterval(objectFallInterval);
+
+    // Reset variables
+    score = 0;
+    gameTime = 60;
+    difficultyLevel = 1;
+    isPaused = false;
+
+    scoreElement.textContent = `Score: ${score}`;
+    timerElement.textContent = `Time: ${gameTime}`;
+
+    // Remove existing objects
+    document.querySelectorAll('.object').forEach((obj) => obj.remove());
+
+    gameInterval = null;
+    objectFallInterval = null;
+    startGame();
+}
+
+// End game and save high score
+function endGame() {
+    saveHighScore(score);
+    displayHighScores();
+}
+
+// Save high score
+function saveHighScore(score) {
+    const playerName = prompt('Enter your name:') || 'Anonymous';
+    highScores.push({ name: playerName, score });
+    highScores.sort((a, b) => b.score - a.score);
+    highScores = highScores.slice(0, 5); // Keep top 5 scores
+    localStorage.setItem('highScores', JSON.stringify(highScores));
+}
+
+// Display high scores
+function displayHighScores() {
+    const highScoreList = document.createElement('div');
+    highScoreList.id = 'high-scores';
+    highScoreList.innerHTML = '<h2>High Scores</h2>';
+
+    const table = document.createElement('table');
+    table.style.width = '100%';
+    table.style.borderCollapse = 'collapse';
+    table.style.backgroundColor = '#f8f9fa';
+
+    const headerRow = document.createElement('tr');
+    headerRow.innerHTML = `
+      <th style="border: 1px solid #ccc; padding: 8px; background-color: #6c757d; color: white;">Rank</th>
+      <th style="border: 1px solid #ccc; padding: 8px; background-color: #6c757d; color: white;">Name</th>
+      <th style="border: 1px solid #ccc; padding: 8px; background-color: #6c757d; color: white;">Score</th>
+    `;
+    table.appendChild(headerRow);
+
+    highScores.forEach((entry, index) => {
+        const row = document.createElement('tr');
+        row.innerHTML = `
+          <td style="border: 1px solid #ccc; padding: 8px;">${index + 1}</td>
+          <td style="border: 1px solid #ccc; padding: 8px;">${entry.name}</td>
+          <td style="border: 1px solid #ccc; padding: 8px;">${entry.score}</td>
+        `;
+        table.appendChild(row);
+    });
+
+    highScoreList.appendChild(table);
+    document.body.appendChild(highScoreList);
+}
+
+// Attach button events
+startButton.addEventListener('click', startGame);
+pauseButton.addEventListener('click', pauseGame);
+restartButton.addEventListener('click', restartGame);
